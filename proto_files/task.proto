@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package parser;
+
+service Coordinator {
+  rpc GetTask (TaskRequest) returns (TaskResponse);
+  rpc ReportResult (TaskResult) returns (ResultAck);
+}
+
+message TaskRequest {
+  string worker_id = 1;
+}
+
+message TaskResponse {
+  string url = 1;
+  bool has_task = 2;
+}
+
+message TaskResult {
+  string worker_id = 1;
+  string url = 2;
+  string result = 3;
+}
+
+message ResultAck {
+  bool success = 1;
+}
