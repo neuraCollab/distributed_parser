@@ -1,4 +1,4 @@
-# Используем официальный образ для Ubuntu
+# Используем официальный образ Ubuntu в качестве базового
 FROM ubuntu:20.04
 
 # Установка необходимых зависимостей
@@ -8,20 +8,21 @@ RUN apt-get update && apt-get install -y \
     libprotobuf-dev \
     protobuf-compiler \
     libgrpc++-dev \
-    curl \
     libcurl4-openssl-dev \
-    libxml2-dev
+    libxml2-dev \
+    git \
+    make
 
-# Копируем файлы проекта
+# Установка CMake
+RUN apt-get install -y cmake
+
+# Копирование исходного кода воркера в контейнер
 WORKDIR /app
-COPY ./worker /app
-COPY ./generated /app/generated
-COPY ./include /app/include
+COPY . /app
 
 # Сборка воркера
-RUN g++ worker.cpp html_parser.cpp page_fetcher.cpp main.cpp \
-    generated/task.pb.cc generated/task.grpc.pb.cc \
-    -o worker -std=c++17 -lgrpc++ -lprotobuf -lxml2 -lcurl -pthread
+WORKDIR /app/worker
+RUN make
 
-# Запуск воркера
+# Установка порта и запуск воркера
 CMD ["./worker"]

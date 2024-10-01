@@ -1,16 +1,22 @@
 CXX = g++
-CXXFLAGS = -std=c++17 -I../include -I/usr/local/include
-LDFLAGS = -L/usr/local/lib -lgrpc++ -lprotobuf -pthread
+CXXFLAGS = -std=c++17 -I. -Wall
+LDFLAGS = -lgrpc++ -lprotobuf -lpthread -lcurl -lxml2
 
-SRCS = coordinator.cpp main.cpp ../generated/task.pb.cc ../generated/task.grpc.pb.cc
+# Файлы проекта
+SRCS = coordinator.cpp main.cpp
 OBJS = $(SRCS:.cpp=.o)
 
 TARGET = coordinator
 
+# Правило для сборки всего проекта
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-    $(CXX) -o $@ $(OBJS) $(LDFLAGS)
+	$(CXX) -o $@ $(OBJS) $(LDFLAGS)
 
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# Правило для очистки скомпилированных файлов
 clean:
-    rm -f $(OBJS) $(TARGET)
+	rm -f $(OBJS) $(TARGET)

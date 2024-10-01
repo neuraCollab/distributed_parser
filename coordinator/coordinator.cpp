@@ -1,67 +1,39 @@
+#include "coordinator.h"
 #include <iostream>
-#include <memory>
-#include <string>
-#include <vector>
 #include <mutex>
-#include <grpcpp/grpcpp.h>
-#include "task.grpc.pb.h"
 
-using grpc::Server;
-using grpc::ServerBuilder;
-using grpc::ServerContext;
-using grpc::Status;
-using parser::Coordinator;
-using parser::TaskRequest;
-using parser::TaskResponse;
-using parser::TaskResult;
-using parser::ResultAck;
-
-class CoordinatorServiceImpl final : public Coordinator::Service {
-public:
-    CoordinatorServiceImpl() {
-        // Добавление заданий в очередь
-        tasks = {"https://example.com", "https://example2.com", "https://example3.com"};
-    }
-
-    Status GetTask(ServerContext* context, const TaskRequest* request, TaskResponse* response) override {
-        std::lock_guard<std::mutex> lock(mu_);
-        if (tasks.empty()) {
-            response->set_has_task(false);
-        } else {
-            response->set_url(tasks.back());
-            response->set_has_task(true);
-            tasks.pop_back();
-        }
-        return Status::OK;
-    }
-
-    Status ReportResult(ServerContext* context, const TaskResult* result, ResultAck* ack) override {
-        std::lock_guard<std::mutex> lock(mu_);
-        std::cout << "Worker " << result->worker_id() << " completed task for URL " << result->url() 
-                  << " with result: " << result->result() << std::endl;
-        ack->set_success(true);
-        return Status::OK;
-    }
-
-private:
-    std::vector<std::string> tasks;
-    std::mutex mu_;
-};
-
-void RunServer() {
-    std::string server_address("0.0.0.0:50051");
-    CoordinatorServiceImpl service;
-
-    ServerBuilder builder;
-    builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
-    builder.RegisterService(&service);
-
-    std::unique_ptr<Server> server(builder.BuildAndStart());
-    std::cout << "Server listening on " << server_address << std::endl;
-    server->Wait();
+// Конструктор класса CoordinatorServiceImpl
+CoordinatorServiceImpl::CoordinatorServiceImpl() {
+    // Изначально список заданий пуст, задания будут добавляться через SubmitTask
 }
 
-int main(int argc, char** argv) {
-    RunServer();
-    return 0;
+// Метод для получения задания воркером
+grpc::Status CoordinatorServiceImpl::GetTask(grpc::ServerContext* context, const parser::TaskRequest* request, parser::TaskResponse* response) {
+    std::lock_guard<std::mutex> lock(mu_);
+    if (tasks.empty()) {
+        response->set_has_task(false);
+    } else {
+        response->set_url(tasks.back());
+        response->set_has_task(true);
+        tasks.pop_back();
+    }
+    return grpc::Status::OK;
+}
+
+// Метод для получения результатов от воркеров
+grpc::Status CoordinatorServiceImpl::ReportResult(grpc::ServerContext* context, const parser::TaskResult* result, parser::ResultAck* ack) {
+    std::lock_guard<std::mutex> lock(mu_);
+    std::cout << "Worker " << result->worker_id() << " completed task for URL " << result->url() 
+              << " with result: " << result->result() << std::endl;
+    ack->set_success(true);
+    return grpc::Status::OK;
+}
+
+// Метод для добавления нового задания в очередь (получение URL-адреса от клиента)
+grpc::Status CoordinatorServiceImpl::SubmitTask(grpc::ServerContext* context, const parser::SubmitTaskRequest* request, parser::SubmitTaskResponse* response) {
+    std::lock_guard<std::mutex> lock(mu_);
+    tasks.push_back(request->url());
+    std::cout << "Received new task: " << request->url() << std::endl;
+    response->set_success(true);
+    return grpc::Status::OK;
 }

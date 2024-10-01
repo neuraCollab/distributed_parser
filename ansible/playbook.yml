@@ -1,0 +1,101 @@
+---
+- name: Distributed Parser Project Setup
+  hosts: all
+  vars:
+    coordinator_dir: "../coordinator"
+    worker_dir: "../worker"
+    proto_dir: "../proto_files"
+    output_dir: "../generated"
+    build_dir: "../build_dir"
+    install_dir: "/home/{{ lookup('env', 'USER') }}/.local"
+    grpc_repo_url: "https://github.com/grpc/grpc.git"
+    grpc_build_dir: "/tmp/grpc_build"
+
+  tasks:
+    - name: Install Dependencies
+      apt:
+        name: "{{ item }}"
+        state: present
+      loop:
+        - build-essential
+        - autoconf
+        - libtool
+        - pkg-config
+        - cmake
+        - git
+        - g++
+        - make
+      tags: install_dependencies
+      become: true
+
+    - name: Create installation directory
+      file:
+        path: "{{ install_dir }}"
+        state: directory
+        mode: '0755'
+      tags: setup
+
+    - name: Add local bin to PATH
+      lineinfile:
+        path: ~/.bashrc
+        line: 'export PATH="{{ install_dir }}/bin:$PATH"'
+        state: present
+      tags: setup
+
+    - name: Clone gRPC repository
+      git:
+        repo: "{{ grpc_repo_url }}"
+        dest: "{{ grpc_build_dir }}"
+        version: v1.66.0
+        update: no
+        recursive: yes
+        depth: 1
+      tags: install_grpc
+
+    - name: Build and install gRPC and Protocol Buffers
+      shell: |
+        mkdir -p {{ grpc_build_dir }}/cmake/build
+        cd {{ grpc_build_dir }}/cmake/build
+        cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX={{ install_dir }} ../..
+        make -j$(nproc)
+        make install
+      args:
+        chdir: "{{ grpc_build_dir }}"
+      async: 3600
+      become: true
+      tags: install_grpc
+
+    - name: Generate Protobuf Files - gRPC Output
+      command: >
+        {{ install_dir }}/bin/protoc -I={{ proto_dir }} --grpc_out={{ output_dir }} --plugin=protoc-gen-grpc={{ install_dir }}/bin/grpc_cpp_plugin {{ proto_dir }}/task.proto
+      args:
+        chdir: "{{ proto_dir }}"
+      tags: generate_protos
+
+    - name: Build Coordinator
+      command: make
+      args:
+        chdir: "{{ coordinator_dir }}"
+      tags: build_all
+
+    - name: Build Worker
+      command: make
+      args:
+        chdir: "{{ worker_dir }}"
+      tags: build_all
+
+    - name: Run Coordinator
+      command: ./coordinator
+      args:
+        chdir: "{{ coordinator_dir }}"
+      async: 3600
+      poll: 0
+      tags: run_coordinator
+
+    - name: Run Worker
+      command: ./worker
+      args:
+        chdir: "{{ worker_dir }}"
+      async: 3600
+      poll: 0
+      tags: run_worker

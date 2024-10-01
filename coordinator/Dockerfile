@@ -1,4 +1,4 @@
-# Используем официальный образ для Ubuntu
+# Используем официальный образ Ubuntu в качестве базового
 FROM ubuntu:20.04
 
 # Установка необходимых зависимостей
@@ -8,19 +8,20 @@ RUN apt-get update && apt-get install -y \
     libprotobuf-dev \
     protobuf-compiler \
     libgrpc++-dev \
-    curl \
     libcurl4-openssl-dev \
-    libxml2-dev
+    libxml2-dev \
+    git
 
-# Копируем файлы проекта
+# Установка CMake
+RUN apt-get install -y cmake
+
+# Копирование исходного кода координатора в контейнер
 WORKDIR /app
-COPY ./coordinator /app
-COPY ./generated /app/generated
-COPY ./include /app/include
+COPY . /app
 
 # Сборка координатора
-RUN g++ coordinator.cpp main.cpp generated/task.pb.cc generated/task.grpc.pb.cc \
-    -o coordinator -std=c++17 -lgrpc++ -lprotobuf -pthread
+RUN cmake . && make
 
-# Запуск координатора
+# Установка порта и запуск координатора
+EXPOSE 50051
 CMD ["./coordinator"]

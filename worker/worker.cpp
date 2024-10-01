@@ -1,171 +1,129 @@
+#include "worker.h"
+#include "page_fetcher.h"
+#include "html_parser.h"
+#include <cassandra.h>
 #include <iostream>
-#include <memory>
-#include <string>
-#include <thread>
 #include <chrono>
-#include <grpcpp/grpcpp.h>
-#include "task.grpc.pb.h"
-#include <libxml/HTMLparser.h>
-#include <libxml/xpath.h>
-#include <curl/curl.h>
 
-using grpc::Channel;
-using grpc::ClientContext;
-using grpc::Status;
-using parser::Coordinator;
-using parser::TaskRequest;
-using parser::TaskResponse;
-using parser::TaskResult;
-using parser::ResultAck;
+// Конструктор для WorkerClient
+WorkerClient::WorkerClient(std::shared_ptr<grpc::Channel> channel)
+    : stub_(parser::Coordinator::NewStub(channel)) {}
 
-struct MemoryStruct {
-    char *memory;
-    size_t size;
-};
+// Получение задания от координатора
+std::string WorkerClient::GetTask() {
+    parser::TaskRequest request;
+    request.set_worker_id("worker_1");
 
-static size_t WriteMemoryCallback(void *contents, size_t size, size_t nmemb, void *userp) {
-    size_t realsize = size * nmemb;
-    struct MemoryStruct *mem = (struct MemoryStruct *)userp;
+    parser::TaskResponse response;
+    grpc::ClientContext context;
 
-    char *ptr = (char *)realloc(mem->memory, mem->size + realsize + 1);
-    if (ptr == NULL) {
-        std::cerr << "Not enough memory (realloc returned NULL)" << std::endl;
-        return 0;
+    grpc::Status status = stub_->GetTask(&context, request, &response);
+    if (status.ok() && response.has_task()) {
+        return response.url();
+    } else {
+        return "";
     }
-
-    mem->memory = ptr;
-    memcpy(&(mem->memory[mem->size]), contents, realsize);
-    mem->size += realsize;
-    mem->memory[mem->size] = 0;
-
-    return realsize;
 }
 
-void fetchPage(const std::string &url, MemoryStruct &chunk) {
-    CURL *curl_handle;
-    CURLcode res;
+// Отправка результата координатору
+void WorkerClient::ReportResult(const std::string& url, const std::string& result) {
+    parser::TaskResult taskResult;
+    taskResult.set_worker_id("worker_1");
+    taskResult.set_url(url);
+    taskResult.set_result(result);
 
-    chunk.memory = (char *)malloc(1);
-    chunk.size = 0;
+    parser::ResultAck ack;
+    grpc::ClientContext context;
 
-    curl_global_init(CURL_GLOBAL_ALL);
-    curl_handle = curl_easy_init();
-
-    curl_easy_setopt(curl_handle, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, WriteMemoryCallback);
-    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)&chunk);
-
-    res = curl_easy_perform(curl_handle);
-
-    if (res != CURLE_OK) {
-        std::cerr << "curl_easy_perform() failed: " << curl_easy_strerror(res) << std::endl;
+    grpc::Status status = stub_->ReportResult(&context, taskResult, &ack);
+    if (!status.ok()) {
+        std::cerr << "Failed to report result: " << status.error_message() << std::endl;
     }
-
-    curl_easy_cleanup(curl_handle);
-    curl_global_cleanup();
 }
 
-void parseHtml(const std::string &htmlContent) {
-    htmlDocPtr doc = htmlReadMemory(htmlContent.c_str(), htmlContent.size(), NULL, NULL, HTML_PARSE_NOERROR | HTML_PARSE_NOWARNING);
-    if (doc == nullptr) {
-        std::cerr << "Error: unable to parse HTML content" << std::endl;
-        return;
-    }
+// Сохранение результата в базу данных Apache Cassandra
+void saveToCassandra(const std::string& url, const std::vector<std::string>& links, double time_taken) {
+    // Инициализация подключения к Cassandra
+    CassCluster* cluster = cass_cluster_new();
+    CassSession* session = cass_session_new();
 
-    xmlXPathContextPtr xpathCtx = xmlXPathNewContext(doc);
-    if (xpathCtx == nullptr) {
-        std::cerr << "Error: unable to create new XPath context" << std::endl;
-        xmlFreeDoc(doc);
-        return;
-    }
+    // Настройка контактов (узлов кластера)
+    cass_cluster_set_contact_points(cluster, "127.0.0.1");
 
-    xmlXPathObjectPtr xpathObj = xmlXPathEvalExpression((const xmlChar *)"//a", xpathCtx);
-    if (xpathObj == nullptr) {
-        std::cerr << "Error: unable to evaluate XPath expression" << std::endl;
-        xmlXPathFreeContext(xpathCtx);
-        xmlFreeDoc(doc);
-        return;
-    }
+    // Подключение к ключевому пространству "parser"
+    CassFuture* connect_future = cass_session_connect_keyspace(session, cluster, "parser");
 
-    xmlNodeSetPtr nodes = xpathObj->nodesetval;
-    for (int i = 0; i < nodes->nodeNr; i++) {
-        xmlNodePtr node = nodes->nodeTab[i];
-        xmlChar *href = xmlGetProp(node, (const xmlChar *)"href");
-        if (href != nullptr) {
-            std::cout << "Link: " << href << std::endl;
-            xmlFree(href);
+    // Ожидание подключения
+    if (cass_future_error_code(connect_future) == CASS_OK) {
+        // Подготовка запроса на вставку данных
+        const char* query = "INSERT INTO parsed_results (url, links, time_taken) VALUES (?, ?, ?)";
+        CassStatement* statement = cass_statement_new(query, 3);
+        
+        // Установка значений в запрос
+        cass_statement_bind_string(statement, 0, url.c_str());
+
+        // Конвертация ссылок в формат Cassandra (set<text>)
+        CassCollection* link_collection = cass_collection_new(CASS_COLLECTION_TYPE_SET, links.size());
+        for (const auto& link : links) {
+            cass_collection_append_string(link_collection, link.c_str());
         }
+        cass_statement_bind_collection(statement, 1, link_collection);
+        cass_collection_free(link_collection);
+
+        // Установка времени выполнения
+        cass_statement_bind_double(statement, 2, time_taken);
+
+        // Выполнение запроса
+        CassFuture* result_future = cass_session_execute(session, statement);
+
+        if (cass_future_error_code(result_future) != CASS_OK) {
+            const char* message;
+            size_t message_length;
+            cass_future_error_message(result_future, &message, &message_length);
+            std::cerr << "Unable to save result to Cassandra: " << std::string(message, message_length) << std::endl;
+        }
+
+        // Освобождение ресурсов
+        cass_statement_free(statement);
+        cass_future_free(result_future);
+    } else {
+        std::cerr << "Unable to connect to Cassandra" << std::endl;
     }
 
-    xmlXPathFreeObject(xpathObj);
-    xmlXPathFreeContext(xpathCtx);
-    xmlFreeDoc(doc);
+    // Освобождение ресурсов
+    cass_future_free(connect_future);
+    cass_session_free(session);
+    cass_cluster_free(cluster);
 }
 
-class WorkerClient {
-public:
-    WorkerClient(std::shared_ptr<Channel> channel)
-        : stub_(Coordinator::NewStub(channel)) {}
+// Функция для обработки задания: загрузка, парсинг и сохранение результата
+void processTask(WorkerClient& worker, const std::string& taskUrl) {
+    std::cout << "Received task: " << taskUrl << std::endl;
 
-    std::string GetTask() {
-        TaskRequest request;
-        request.set_worker_id("worker_1");
+    // Начало измерения времени выполнения задания
+    auto start_time = std::chrono::steady_clock::now();
 
-        TaskResponse response;
-        ClientContext context;
+    // Загрузка страницы
+    MemoryStruct page;
+    fetchPage(taskUrl, page);
 
-        Status status = stub_->GetTask(&context, request, &response);
-        if (status.ok() && response.has_task()) {
-            return response.url();
-        } else {
-            return "";
-        }
+    // Парсинг страницы и сохранение результата
+    if (page.size > 0) {
+        auto links = parseHtml(page.memory);
+
+        // Конец измерения времени выполнения
+        auto end_time = std::chrono::steady_clock::now();
+        double time_taken = std::chrono::duration<double>(end_time - start_time).count();
+
+        // Сохранение результатов в Cassandra
+        saveToCassandra(taskUrl, links, time_taken);
+
+        // Отправка результата обратно координатору
+        worker.ReportResult(taskUrl, "Completed");
+        
+        // Освобождение памяти
+        free(page.memory);
+    } else {
+        std::cerr << "Failed to fetch the page: " << taskUrl << std::endl;
     }
-
-    void ReportResult(const std::string& url, const std::string& result) {
-        TaskResult taskResult;
-        taskResult.set_worker_id("worker_1");
-        taskResult.set_url(url);
-        taskResult.set_result(result);
-
-        ResultAck ack;
-        ClientContext context;
-
-        Status status = stub_->ReportResult(&context, taskResult, &ack);
-        if (!status.ok()) {
-            std::cerr << "Failed to report result: " << status.error_message() << std::endl;
-        }
-    }
-
-private:
-    std::unique_ptr<Coordinator::Stub> stub_;
-};
-
-int main(int argc, char** argv) {
-    WorkerClient worker(grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()));
-
-    while (true) {
-        std::string taskUrl = worker.GetTask();
-        if (!taskUrl.empty()) {
-           // Загружаем и парсим страницу
-            std::cout << "Received task: " << taskUrl << std::endl;
-
-            // Загрузка страницы
-            MemoryStruct page;
-            fetchPage(taskUrl, page);
-
-            // Парсинг страницы
-            if (page.size > 0) {
-                parseHtml(page.memory);
-                // Отправляем результат обратно координатору
-                worker.ReportResult(taskUrl, "Completed");
-                free(page.memory);
-            }
-        } else {
-            // Если нет задания, ждем немного перед следующим запросом
-            std::this_thread::sleep_for(std::chrono::seconds(1));
-        }
-    }
-
-    return 0;
 }

@@ -3,22 +3,28 @@
 # Загрузка переменных из .env файла
 export $(grep -v '^#' ../.env | xargs)
 
-# Создание namespace для проекта (опционально)
-kubectl create namespace $KUBERNETES_NAMESPACE
+# Проверка, что переменная KUBERNETES_NAMESPACE задана
+if [ -z "$KUBERNETES_NAMESPACE" ]; then
+    echo "Error: KUBERNETES_NAMESPACE is not set in the .env file."
+    exit 1
+fi
+
+# Создание namespace для проекта (если он не существует)
+kubectl create namespace $KUBERNETES_NAMESPACE || echo "Namespace $KUBERNETES_NAMESPACE already exists"
 
 # Создание ConfigMap с переменными окружения
-kubectl apply -f ../kubernetes/env-configmap.yaml -n $KUBERNETES_NAMESPACE
+envsubst < ../kubernetes/env-configmap.yaml | kubectl apply -n $KUBERNETES_NAMESPACE -f -
 
 # Применение конфигураций для координатора
-kubectl apply -f ../kubernetes/coordinator-deployment.yaml -n $KUBERNETES_NAMESPACE
-kubectl apply -f ../kubernetes/coordinator-service.yaml -n $KUBERNETES_NAMESPACE
+envsubst < ../kubernetes/coordinator-deployment.yaml | kubectl apply -n $KUBERNETES_NAMESPACE -f -
+envsubst < ../kubernetes/coordinator-service.yaml | kubectl apply -n $KUBERNETES_NAMESPACE -f -
 
 # Применение конфигураций для воркеров
-kubectl apply -f ../kubernetes/worker-deployment.yaml -n $KUBERNETES_NAMESPACE
-kubectl apply -f ../kubernetes/worker-service.yaml -n $KUBERNETES_NAMESPACE
+envsubst < ../kubernetes/worker-deployment.yaml | kubectl apply -n $KUBERNETES_NAMESPACE -f -
+envsubst < ../kubernetes/worker-service.yaml | kubectl apply -n $KUBERNETES_NAMESPACE -f -
 
 # Применение конфигураций для Cassandra
-kubectl apply -f ../kubernetes/cassandra-statefulset.yaml -n $KUBERNETES_NAMESPACE
-kubectl apply -f ../kubernetes/cassandra-service.yaml -n $KUBERNETES_NAMESPACE
+envsubst < ../kubernetes/cassandra-statefulset.yaml | kubectl apply -n $KUBERNETES_NAMESPACE -f -
+envsubst < ../kubernetes/cassandra-service.yaml | kubectl apply -n $KUBERNETES_NAMESPACE -f -
 
 echo "All components have been deployed to Kubernetes namespace $KUBERNETES_NAMESPACE!"
