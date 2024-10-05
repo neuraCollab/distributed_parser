@@ -6,7 +6,7 @@ INVENTORY = $(ANSIBLE_DIR)/inventory.ini
 all:  pre_requirements build run
 
 pre_requirements:
-	sudo apt install ansible -y
+	 sudo apt-get update && sudo apt install ansible -y
 # Задача для выполнения основного playbook (build и запуск)
 build:
 	ansible-playbook -i $(INVENTORY) $(ANSIBLE_DIR)/playbook.yml --tags generate_protos,build_all

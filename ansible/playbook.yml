@@ -7,26 +7,43 @@
     proto_dir: "../proto_files"
     output_dir: "../generated"
     build_dir: "../build_dir"
-    install_dir: "/home/{{ lookup('env', 'USER') }}/.local"
+    install_dir: "/usr/local"
     grpc_repo_url: "https://github.com/grpc/grpc.git"
     grpc_build_dir: "/tmp/grpc_build"
+    absl_repo_url: "https://github.com/abseil/abseil-cpp.git"
+    absl_build_dir: "/tmp/abseil"
+    vcpkg_dir: "/opt/vcpkg"
+    grpc_version: "v1.44.0"
 
   tasks:
+
     - name: Install Dependencies
       apt:
         name: "{{ item }}"
         state: present
       loop:
-        - build-essential
-        - autoconf
-        - libtool
-        - pkg-config
-        - cmake
-        - git
-        - g++
-        - make
+          - build-essential
+          - autoconf
+          - libtool
+          - pkg-config
+          - cmake
+          - git
+          - wget
+          - unzip
+          - libssl-dev
+          - libgflags-dev
+          - libgtest-dev
+          - clang
+          - libc++-dev
+          - ninja-build
+          - curl
+          - tar 
+          - zip
       tags: install_dependencies
       become: true
+
+
+
 
     - name: Create installation directory
       file:
@@ -42,35 +59,90 @@
         state: present
       tags: setup
 
-    - name: Clone gRPC repository
-      git:
-        repo: "{{ grpc_repo_url }}"
-        dest: "{{ grpc_build_dir }}"
-        version: v1.66.0
-        update: no
-        recursive: yes
-        depth: 1
-      tags: install_grpc
 
-    - name: Build and install gRPC and Protocol Buffers
+
+
+
+
+
+
+    - name: Compile and install gRPC and protobuf plugin
       shell: |
-        mkdir -p {{ grpc_build_dir }}/cmake/build
-        cd {{ grpc_build_dir }}/cmake/build
-        cmake -DgRPC_INSTALL=ON -DgRPC_BUILD_TESTS=OFF -DCMAKE_INSTALL_PREFIX={{ install_dir }} ../..
-        make -j$(nproc)
+        git clone -b v1.44.0 https://github.com/grpc/grpc /tmp/grpc
+        cd /tmp/grpc
+        git submodule update --init
+        mkdir -p cmake/build
+        cd cmake/build
+        cmake -DCMAKE_INSTALL_PREFIX={{ install_dir }}/bin/grpc -DgRPC_ABSL_PROVIDER=package ../..
+        make
         make install
+        make plugins
       args:
-        chdir: "{{ grpc_build_dir }}"
-      async: 3600
+        chdir: /tmp
+      tags: protobuf
+
+    # - name: Ensure grpc_cpp_plugin is in PATH
+    #   shell: |
+    #     echo 'export PATH=$PATH:{{ install_dir }}/bin' >> ~/.bashrc
+    #     source ~/.bashrc
+    #   args:
+    #     executable: /bin/bash
+    #   tags: protobuf
+
+    # - name: Clone gRPC repository
+    #   git:
+    #     repo: https://github.com/grpc/grpc.git
+    #     dest: /tmp/grpc
+    #     version: "{{ grpc_version }}"
+    #     update: yes
+
+    # - name: Create build directory
+    #   file:
+    #     path: /tmp/grpc/cmake/build
+    #     state: directory
+
+    # - name: Build gRPC using CMake
+    #   shell: |
+    #     cd /tmp/grpc/cmake/build
+    #     cmake -DCMAKE_INSTALL_PREFIX={{ install_dir }} -DgRPC_INSTALL=ON -DBUILD_SHARED_LIBS=OFF ../..
+    #     make
+    #     make install
+    #   become: true
+    #   args:
+    #     chdir: /tmp/grpc/cmake/build
+
+    - name: Move all files to install directory
+      shell: |
+        mkdir -p /usr/local/bin/grpc
+        cp -r /tmp/grpc/cmake/build/* /usr/local/bin/grpc
+        cp -r /tmp/grpc/* /usr/local/
+      when: >
+        (lookup('fileglob', '/usr/local/bin/grpc/*') | length) == 0
       become: true
-      tags: install_grpc
+      
+
+    - name: Install protoc
+      shell: |
+        wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
+        unzip -o protoc-21.12-linux-x86_64.zip -d /usr/local bin/protoc
+        unzip -o protoc-21.12-linux-x86_64.zip -d /usr/local 'include/*'
+      become: true
+      tags: install_protoc
+
+
+
 
     - name: Generate Protobuf Files - gRPC Output
       command: >
-        {{ install_dir }}/bin/protoc -I={{ proto_dir }} --grpc_out={{ output_dir }} --plugin=protoc-gen-grpc={{ install_dir }}/bin/grpc_cpp_plugin {{ proto_dir }}/task.proto
+        {{ install_dir }}/bin/protoc -I={{ proto_dir }} --grpc_out={{ output_dir }} --plugin=protoc-gen-grpc=/usr/local/bin/grpc/grpc_cpp_plugin {{ proto_dir }}/task.proto
       args:
         chdir: "{{ proto_dir }}"
       tags: generate_protos
+
+
+    
+
+
 
     - name: Build Coordinator
       command: make
@@ -84,6 +156,9 @@
         chdir: "{{ worker_dir }}"
       tags: build_all
 
+
+
+
     - name: Run Coordinator
       command: ./coordinator
       args:
@@ -91,6 +166,10 @@
       async: 3600
       poll: 0
       tags: run_coordinator
+
+
+
+
 
     - name: Run Worker
       command: ./worker
