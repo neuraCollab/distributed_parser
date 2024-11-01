@@ -9,8 +9,10 @@ pre_requirements:
 	 sudo apt-get update && sudo apt install ansible -y
 # Задача для выполнения основного playbook (build и запуск)
 build:
-	ansible-playbook -i $(INVENTORY) $(ANSIBLE_DIR)/playbook.yml --tags generate_protos,build_all
+	ansible-playbook -i $(INVENTORY) $(ANSIBLE_DIR)/playbook.yml --tags all --ask-become-pass
 
+b:
+	ansible-playbook -i $(INVENTORY) $(ANSIBLE_DIR)/playbook.yml --tags generate_protos 
 # Задача для запуска координатора и воркера
 run:
 	ansible-playbook -i $(INVENTORY) $(ANSIBLE_DIR)/playbook.yml --tags run_coordinator,run_worker

@@ -32,6 +32,8 @@
           - unzip
           - libssl-dev
           - libgflags-dev
+          - protobuf-compiler 
+          - libprotobuf-dev
           - libgtest-dev
           - clang
           - libc++-dev
@@ -81,35 +83,6 @@
         chdir: /tmp
       tags: protobuf
 
-    # - name: Ensure grpc_cpp_plugin is in PATH
-    #   shell: |
-    #     echo 'export PATH=$PATH:{{ install_dir }}/bin' >> ~/.bashrc
-    #     source ~/.bashrc
-    #   args:
-    #     executable: /bin/bash
-    #   tags: protobuf
-
-    # - name: Clone gRPC repository
-    #   git:
-    #     repo: https://github.com/grpc/grpc.git
-    #     dest: /tmp/grpc
-    #     version: "{{ grpc_version }}"
-    #     update: yes
-
-    # - name: Create build directory
-    #   file:
-    #     path: /tmp/grpc/cmake/build
-    #     state: directory
-
-    # - name: Build gRPC using CMake
-    #   shell: |
-    #     cd /tmp/grpc/cmake/build
-    #     cmake -DCMAKE_INSTALL_PREFIX={{ install_dir }} -DgRPC_INSTALL=ON -DBUILD_SHARED_LIBS=OFF ../..
-    #     make
-    #     make install
-    #   become: true
-    #   args:
-    #     chdir: /tmp/grpc/cmake/build
 
     - name: Move all files to install directory
       shell: |
@@ -123,7 +96,7 @@
 
     - name: Install protoc
       shell: |
-        wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
+        [ -f protoc-21.12-linux-x86_64.zip ] || wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
         unzip -o protoc-21.12-linux-x86_64.zip -d /usr/local bin/protoc
         unzip -o protoc-21.12-linux-x86_64.zip -d /usr/local 'include/*'
       become: true
@@ -134,7 +107,7 @@
 
     - name: Generate Protobuf Files - gRPC Output
       command: >
-        {{ install_dir }}/bin/protoc -I={{ proto_dir }} --grpc_out={{ output_dir }} --plugin=protoc-gen-grpc=/usr/local/bin/grpc/grpc_cpp_plugin {{ proto_dir }}/task.proto
+        {{ install_dir }}/bin/protoc -I={{ proto_dir }} --cpp_out={{ output_dir }} --grpc_out={{ output_dir }} --plugin=protoc-gen-grpc=/usr/local/bin/grpc/grpc_cpp_plugin {{ proto_dir }}/task.proto
       args:
         chdir: "{{ proto_dir }}"
       tags: generate_protos
