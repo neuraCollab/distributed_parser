@@ -1,65 +1,63 @@
-# Используем официальный образ Ubuntu в качестве базового
-FROM ubuntu:20.04
+# Используем официальный образ Ubuntu 20.04 в качестве базового
+FROM base-vcpkg
 
-# Установка переменной окружения для предотвращения интерактивных запросов
-ENV DEBIAN_FRONTEND=noninteractive 
+# Устанавливаем переменную окружения для предотвращения интерактивных запросов
+ENV DEBIAN_FRONTEND=noninteractive
 
 # Установка необходимых инструментов и библиотек
-RUN apt-get update && apt-get install -y \
-    g++ \
+RUN apt-get update && \
+    apt-get install -y \
+    build-essential \
     cmake \
-    libcurl4-openssl-dev \
-    libxml2-dev \
     git \
-    libgrpc++-dev \
-    protobuf-compiler-grpc \
-    libprotobuf-dev \
-    protobuf-compiler \
     wget \
     unzip \
-    && apt-get clean
+    libssl-dev \
+    pkg-config \
+    autoconf \
+    automake \
+    libtool \
+    curl \
+    zlib1g-dev
 
-# Установка CMake (если требуется более свежая версия)
-RUN apt-get install -y software-properties-common && \
-    add-apt-repository ppa:ubuntu-toolchain-r/test && \
-    apt-get update && apt-get install -y cmake
+# Клонирование репозитория gRPC версии v1.44.0 и инициализация подмодулей
+RUN git clone -b v1.44.0 https://github.com/grpc/grpc /tmp/grpc && \
+    cd /tmp/grpc && \
+    git submodule update --init --recursive
 
-# Рабочая директория
+RUN vcpkg install  abseil c-ares
+# Сборка и установка gRPC и его зависимостей
+RUN mkdir -p /tmp/grpc/cmake/build && \
+    cd /tmp/grpc/cmake/build && \
+    cmake -DCMAKE_INSTALL_PREFIX=/tmp/grpc/bin/grpc -DgRPC_ABSL_PROVIDER=package \ 
+          ../.. && \
+    make -j$(nproc) && \
+    make install
+
+# Установка переменных окружения
+ENV PATH="/usr/local/bin:${PATH}"
+ENV PKG_CONFIG_PATH="/usr/local/lib/pkgconfig"
+
+# Установка protoc версии 21.12
+RUN PROTOC_ZIP=protoc-21.12-linux-x86_64.zip && \
+    wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/${PROTOC_ZIP} && \
+    unzip -o ${PROTOC_ZIP} -d /usr/local bin/protoc 'include/*' && \
+    rm -f ${PROTOC_ZIP}
+
+# Проверка установки protoc
+RUN protoc --version
+
+# Установка рабочей директории
 WORKDIR /app
 
 # Копирование исходного кода проекта
-COPY . /app
-
-# Кэширование Abseil и других git репозиториев
-# Использование кеша для скачивания репозиториев
-RUN if [ ! -d "/app/abseil-cpp" ]; then \
-      git clone https://github.com/abseil/abseil-cpp.git; \
-    fi
-
-# Установка gRPC и protobuf
-RUN if [ ! -d "/tmp/grpc" ]; then \
-      git clone -b v1.44.0 https://github.com/grpc/grpc /tmp/grpc && \
-      cd /tmp/grpc && \
-      git submodule update --init && \
-      mkdir -p cmake/build && \
-      cd cmake/build && \
-      cmake -DCMAKE_INSTALL_PREFIX=/usr/local ../.. && \
-      make && \
-      make install && \
-      make plugins; \
-    fi
-
-# Сборка Abseil из исходников
-RUN cd /app/abseil-cpp && \
-    rm -rf build && mkdir build && cd build && \
-    cmake -DABSL_BUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release .. && \
-    cmake --build . --target install && \
-    cd ../..
+COPY . .
 
 # Сборка проекта
-RUN rm -rf build && mkdir -p build && cd build && \
-    cmake .. && \
-    make
+RUN mkdir -p build && \
+    cd build && \
+    cmake -DCMAKE_TOOLCHAIN_FILE=/vcpkg/scripts/buildsystems/vcpkg.cmake .. && \
+    make -j$(nproc)
 
 # Открытие порта
 EXPOSE 50051

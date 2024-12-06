@@ -11,17 +11,20 @@ RUN apt-get update && apt-get install -y \
     unzip \
     zip \
     tar \
+    protobuf-compiler \
     pkg-config \
     && apt-get clean
 
 # Установка vcpkg
 WORKDIR /vcpkg
-RUN git clone https://github.com/microsoft/vcpkg.git . && \
+RUN git clone https://github.com/microsoft/vcpkg.git . &&   \
     ./bootstrap-vcpkg.sh && \
-    ./vcpkg integrate install
+    ./vcpkg integrate install 
 
 # Установка общих зависимостей через vcpkg (добавьте свои библиотеки)
-RUN ./vcpkg install grpc curl 
+RUN ./vcpkg update
+RUN ./vcpkg upgrade --no-dry-run
+
 
 # Добавление vcpkg в PATH
 ENV VCPKG_ROOT=/vcpkg
