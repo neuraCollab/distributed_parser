@@ -1,34 +1,68 @@
 # Используем официальный образ Ubuntu в качестве базового
 FROM ubuntu:20.04
 
-# Установка необходимых зависимостей
+# Установка переменной окружения для предотвращения интерактивных запросов
+ENV DEBIAN_FRONTEND=noninteractive 
+
+# Установка необходимых инструментов и библиотек
 RUN apt-get update && apt-get install -y \
     g++ \
     cmake \
-    libprotobuf-dev \
-    protobuf-compiler \
-    libgrpc++-dev \
     libcurl4-openssl-dev \
     libxml2-dev \
-    libabsl-dev \
+    git \
     libgrpc++-dev \
-    libcurl4-openssl-dev \
-    git
+    protobuf-compiler-grpc \
+    libprotobuf-dev \
+    protobuf-compiler \
+    wget \
+    unzip \
+    && apt-get clean
 
-# Установка CMake
-RUN apt-get install -y cmake git
+# Установка CMake (если требуется более свежая версия)
+RUN apt-get install -y software-properties-common && \
+    add-apt-repository ppa:ubuntu-toolchain-r/test && \
+    apt-get update && apt-get install -y cmake
 
-# Копирование исходного кода координатора в контейнер
+# Рабочая директория
 WORKDIR /app
+
+# Копирование исходного кода проекта
 COPY . /app
 
-RUN git clone https://github.com/abseil/abseil-cpp.git && cd abseil-cpp && mkdir build && cd build \
-    && cmake -DgRPC_INSTALL=ON -DCMAKE_BUILD_TYPE=Release -DgRPC_ABSL_PROVIDER=module -DgRPC_CARES_PROVIDER=module -DgRPC_PROTOBUF_PROVIDER=module -DgRPC_RE2_PROVIDER=module -DgRPC_SSL_PROVIDER=module -DgRPC_ZLIB_PROVIDER=module  -DCMAKE_CXX_FLAGS=-std=c++17 -DCMAKE_CXX_FLAGS='-D_GLIBCXX_USE_CXX11_ABI=0'  ../ \
-    && make -j$(nproc) && make install && cd ../..
+# Кэширование Abseil и других git репозиториев
+# Использование кеша для скачивания репозиториев
+RUN if [ ! -d "/app/abseil-cpp" ]; then \
+      git clone https://github.com/abseil/abseil-cpp.git; \
+    fi
 
-# Сборка координатора
-RUN cmake . && make
+# Установка gRPC и protobuf
+RUN if [ ! -d "/tmp/grpc" ]; then \
+      git clone -b v1.44.0 https://github.com/grpc/grpc /tmp/grpc && \
+      cd /tmp/grpc && \
+      git submodule update --init && \
+      mkdir -p cmake/build && \
+      cd cmake/build && \
+      cmake -DCMAKE_INSTALL_PREFIX=/usr/local ../.. && \
+      make && \
+      make install && \
+      make plugins; \
+    fi
 
-# Установка порта и запуск координатора
+# Сборка Abseil из исходников
+RUN cd /app/abseil-cpp && \
+    rm -rf build && mkdir build && cd build && \
+    cmake -DABSL_BUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release .. && \
+    cmake --build . --target install && \
+    cd ../..
+
+# Сборка проекта
+RUN rm -rf build && mkdir -p build && cd build && \
+    cmake .. && \
+    make
+
+# Открытие порта
 EXPOSE 50051
-CMD ["./coordinator"]
+
+# Команда запуска
+CMD ["./build/coordinator"]
