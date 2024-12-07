@@ -1,5 +1,5 @@
 # FROM grpc/cxx:1.12.0
-FROM ubuntu:20.04
+FROM ubuntu:latest
 
 ENV DEBIAN_FRONTEND=noninteractive 
 
@@ -46,20 +46,3 @@ RUN cd grpc \
 		../.. \
 	&& make -j $(nproc) \
 	&& make install
-
-WORKDIR /app
-
-# Копируем исходный код проекта
-COPY . .  
-
-# Сборка проекта
-RUN mkdir -p build && \
-    cd build && \
-    cmake .. && \
-    make -j$(nproc)
-
-# Открываем порт
-EXPOSE 50051
-
-# Команда запуска
-CMD ["./build/coordinator"]

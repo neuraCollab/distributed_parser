@@ -2,7 +2,8 @@
 #define COORDINATOR_H
 
 #include <grpcpp/grpcpp.h>
-#include "../generated/task.grpc.pb.h"
+#include "generated/task.pb.h" 
+#include "generated/task.grpc.pb.h"
 #include <vector>
 #include <string>
 #include <mutex>

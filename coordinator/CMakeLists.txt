@@ -17,7 +17,6 @@ include_directories(
     ../generated
     /usr/local/include
     /usr/include
-    /app/abseil-cpp
 )
 
 # Найти зависимости: Curl, XML, Protobuf, gRPC
@@ -41,7 +40,6 @@ set(GRPC_SRCS
 )
 
 # Указать путь для сборки abseil-cpp
-add_subdirectory(/app/abseil-cpp)
 
 # Сборка исполняемого файла
 add_executable(coordinator ${SOURCES} ${GRPC_SRCS})
