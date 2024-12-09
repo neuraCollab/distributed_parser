@@ -3,6 +3,7 @@ FROM ubuntu:latest
 
 ENV DEBIAN_FRONTEND=noninteractive 
 
+WORKDIR /usr/local/src
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends \
 		libssl-dev \
@@ -28,12 +29,17 @@ RUN apt-get update \
 		libwebsocketpp-dev libasio-dev \
 		\
 		vim gdb valgrind net-tools iptables procps tcpdump \
-		linux-tools-common linux-tools-generic
+		linux-tools-common linux-tools-generic \
+		\
+		build-essential autoconf libtool pkg-config cmake git \
+        wget unzip libssl-dev libgflags-dev protobuf-compiler \
+		libprotobuf-dev libgtest-dev clang libc++-dev  ninja-build \ 
+        curl tar zip
 
 # Устанавливаем необходимые пакеты, включая CMake
 
 # gRPC
-RUN git clone --recurse-submodules -b v1.66.1 --depth 1 --shallow-submodules https://github.com/grpc/grpc
+RUN git clone --recurse-submodules -b v1.66.1 --depth 1 --shallow-submodules https://github.com/grpc/grpc 
 RUN cd grpc \
 	&& mkdir -p cmake/build \
 	&& cd cmake/build \
@@ -45,4 +51,5 @@ RUN cd grpc \
 		-DBUILD_SHARED_LIBS=ON \
 		../.. \
 	&& make -j $(nproc) \
-	&& make install
+	&& make install \
+	&& make plugins

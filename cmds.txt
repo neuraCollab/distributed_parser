@@ -1,0 +1,6 @@
+docker build -f Dockerfile.vcpkg -t base-vcpkg .
+
+docker run --rm \
+  -v $(pwd)/proto_files:/app/proto_files \
+  -v $(pwd)/generated:/app/generated \
+  grpc-generator

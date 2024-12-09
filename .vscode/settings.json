@@ -1,3 +1,6 @@
 {
-    "cmake.sourceDirectory": "/home/bubu/Documents/distributed_parser/coordinator"
+    "cmake.sourceDirectory": "/home/bubu/Documents/distributed_parser/coordinator",
+    "files.associations": {
+        "mutex": "cpp"
+    }
 }

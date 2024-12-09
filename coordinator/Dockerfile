@@ -1,55 +1,10 @@
-# FROM grpc/cxx:1.12.0
-FROM ubuntu:20.04
+# Используем базовый образ
+FROM prestart:latest
 
-ENV DEBIAN_FRONTEND=noninteractive 
-
-RUN apt-get update \
-	&& apt-get install -y --no-install-recommends \
-		libssl-dev \
-        libxml2-dev \
-		\
-		cmake ninja-build pkg-config clang clang-format build-essential curl \
-		ccache git \
-		\
-		libavcodec-dev libavdevice-dev libavfilter-dev libavformat-dev \
-		libavutil-dev libswresample-dev libswscale-dev libx264-dev \
-		libcurl4-openssl-dev libmbedtls-dev libgl1-mesa-dev libjansson-dev \
-		libluajit-5.1-dev python3-dev libx11-dev libxcb-randr0-dev \
-		libxcb-shm0-dev libxcb-xinerama0-dev libxcb-composite0-dev \
-		libxcomposite-dev libxinerama-dev libxcb1-dev libx11-xcb-dev \
-		libxcb-xfixes0-dev swig libcmocka-dev libxss-dev libglvnd-dev \
-		libgles2-mesa-dev libwayland-dev \
-        \
-        ca-certificates \
-		\
-		libasound2-dev libfdk-aac-dev libfontconfig-dev libfreetype6-dev \
-		libjack-jackd2-dev libpulse-dev libspeexdsp-dev libudev-dev libv4l-dev \
-		libva-dev libvlc-dev  libdrm-dev nlohmann-json3-dev \
-		libwebsocketpp-dev libasio-dev \
-		\
-		vim gdb valgrind net-tools iptables procps tcpdump \
-		linux-tools-common linux-tools-generic
-
-# Устанавливаем необходимые пакеты, включая CMake
-
-# gRPC
-RUN git clone --recurse-submodules -b v1.66.1 --depth 1 --shallow-submodules https://github.com/grpc/grpc
-RUN cd grpc \
-	&& mkdir -p cmake/build \
-	&& cd cmake/build \
-	&& cmake \
-		-DgRPC_INSTALL=ON \
-		-DgRPC_BUILD_TESTS=OFF \
-		-DgRPC_SSL_PROVIDER=package \
-		-DABSL_ENABLE_INSTALL=ON \
-		-DBUILD_SHARED_LIBS=ON \
-		../.. \
-	&& make -j $(nproc) \
-	&& make install
-
+# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Копируем исходный код проекта
+# Копируем исходный код проекта в контейнер
 COPY . .  
 
 # Сборка проекта
@@ -58,8 +13,8 @@ RUN mkdir -p build && \
     cmake .. && \
     make -j$(nproc)
 
-# Открываем порт
+# Открываем порт для приложения
 EXPOSE 50051
 
-# Команда запуска
-CMD ["./build/coordinator"]
+# Устанавливаем точку входа, чтобы контейнер не завершал выполнение
+CMD ["/bin/bash"]
