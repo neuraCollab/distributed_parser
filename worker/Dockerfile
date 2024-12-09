@@ -1,28 +1,41 @@
-# Используем официальный образ Ubuntu в качестве базового
-FROM ubuntu:20.04
+FROM prestart:latest
 
-# Установка необходимых зависимостей
-RUN apt-get update && apt-get install -y \
-    g++ \
+# Установка зависимостей
+RUN apt-get update && \
+    apt-get install -y \
+    build-essential \
     cmake \
-    libprotobuf-dev \
-    protobuf-compiler \
-    libgrpc++-dev \
+    git \
+    libssl-dev \
+    libuv1-dev \
+    zlib1g-dev \
+    curl \
     libcurl4-openssl-dev \
     libxml2-dev \
-    git \
-    make
+    protobuf-compiler \
+    libprotobuf-dev
 
-# Установка CMake
-RUN apt-get install -y cmake
+# Клонирование и установка DataStax C/C++ Driver
+RUN git clone https://github.com/datastax/cpp-driver.git /tmp/cpp-driver && \
+    mkdir -p /tmp/cpp-driver/build && \
+    cd /tmp/cpp-driver/build && \
+    cmake .. && \
+    make && \
+    make install && \
+    ldconfig
 
-# Копирование исходного кода воркера в контейнер
+# Копирование исходного кода
 WORKDIR /app
-COPY . /app
+COPY ./ .
 
-# Сборка воркера
-WORKDIR /app/worker
-RUN make
+# Сборка проекта
+RUN mkdir -p build && \
+    cd build && \
+    cmake .. && \
+    make -j$(nproc)
 
-# Установка порта и запуск воркера
-CMD ["./worker"]
+# Открытие порта
+EXPOSE 50051
+
+# Команда запуска
+CMD ["./build/worker"]

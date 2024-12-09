@@ -2,7 +2,8 @@
 #define WORKER_H
 
 #include <grpcpp/grpcpp.h>
-#include "task.grpc.pb.h"
+#include "/app/generated/task.grpc.pb.h"
+#include "/app/generated/task.pb.h"
 
 class WorkerClient {
 public:
@@ -10,6 +11,7 @@ public:
 
     std::string GetTask();
     void ReportResult(const std::string& url, const std::string& result);
+    void processTask(WorkerClient& worker, const std::string& taskUrl);
 
 private:
     std::unique_ptr<parser::Coordinator::Stub> stub_;

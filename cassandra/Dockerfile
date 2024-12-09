@@ -1,17 +1,21 @@
-# Используем официальный образ Cassandra в качестве базового
+# Используем официальный образ Cassandra
 FROM cassandra:latest
 
-# Копируем кастомные конфигурационные файлы в контейнер
-COPY cassandra-config.yaml /etc/cassandra/cassandra.yaml
+# Устанавливаем переменные окружения для конфигурации Cassandra
+ENV CASSANDRA_CLUSTER_NAME="MyCluster"
+ENV CASSANDRA_DC="datacenter1"
+ENV CASSANDRA_RACK="rack1"
+ENV CASSANDRA_SEEDS="127.0.0.1"
+ENV CASSANDRA_LISTEN_ADDRESS="0.0.0.0"
+ENV CASSANDRA_BROADCAST_ADDRESS="127.0.0.1"
+ENV CASSANDRA_BROADCAST_RPC_ADDRESS="127.0.0.1"
+ENV CASSANDRA_ENDPOINT_SNITCH="GossipingPropertyFileSnitch"
 
-# Установка переменных среды для конфигурации Cassandra
-ENV CASSANDRA_CLUSTER_NAME=$CASSANDRA_CLUSTER_NAME
-ENV CASSANDRA_LISTEN_ADDRESS=$CASSANDRA_LISTEN_ADDRESS
-ENV CASSANDRA_RPC_ADDRESS=$CASSANDRA_RPC_ADDRESS
-ENV CASSANDRA_NUM_TOKENS=$CASSANDRA_NUM_TOKENS
-
-# Выставляем порты, необходимые для работы Cassandra
+# Открываем стандартный порт Cassandra
 EXPOSE 7000 7001 7199 9042 9160
 
-# Настройка команды запуска Cassandra
+# Добавляем пользовательский файл конфигурации (при необходимости)
+# COPY cassandra.yaml /etc/cassandra/cassandra.yaml
+
+# Старт сервера Cassandra
 CMD ["cassandra", "-f"]
