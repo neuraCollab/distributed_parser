@@ -16,6 +16,9 @@ public:
     grpc::Status ReportResult(grpc::ServerContext* context, const parser::TaskResult* result, parser::ResultAck* ack) override;
     grpc::Status SubmitTask(grpc::ServerContext* context, const parser::SubmitTaskRequest* request, parser::SubmitTaskResponse* response) override;
 
+    // Метод для тестирования SubmitTask
+    // void testSubmitTask();
+
 private:
     std::vector<std::string> tasks;  // Очередь заданий
     std::mutex mu_;  // Мьютекс для синхронизации доступа к очереди заданий

@@ -31,6 +31,8 @@ link_directories(/usr/local/lib)
 set(SOURCES
     main.cpp
     worker.cpp
+    page_fetcher.cpp
+    html_parser.cpp
     /app/generated/task.pb.cc
     /app/generated/task.grpc.pb.cc
 )

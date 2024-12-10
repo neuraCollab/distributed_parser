@@ -11,6 +11,9 @@ void RunServer() {
     std::string server_address("0.0.0.0:50051");
     CoordinatorServiceImpl service;
 
+    // Вызов тестового метода
+    // service.testSubmitTask();
+
     ServerBuilder builder;
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
     builder.RegisterService(&service);

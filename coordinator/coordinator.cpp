@@ -37,3 +37,25 @@ grpc::Status CoordinatorServiceImpl::SubmitTask(grpc::ServerContext* context, co
     response->set_success(true);
     return grpc::Status::OK;
 }
+
+// // Реализация метода тестирования
+// void CoordinatorServiceImpl::testSubmitTask() {
+//     parser::SubmitTaskRequest request;
+//     parser::SubmitTaskResponse response;
+
+//     // Установите тестовый URL
+//     request.set_url("http://example.com/test-task");
+
+//     // Создайте фиктивный контекст
+//     grpc::ServerContext context;
+
+//     // Вызовите SubmitTask
+//     grpc::Status status = SubmitTask(&context, &request, &response);
+
+//     // Вывод результатов теста
+//     if (status.ok() && response.success()) {
+//         std::cout << "Test task submitted successfully: " << request.url() << std::endl;
+//     } else {
+//         std::cout << "Test task submission failed!" << std::endl;
+//     }
+// }
