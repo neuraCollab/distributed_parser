@@ -17,4 +17,5 @@ RUN mkdir -p build && \
 EXPOSE 50051
 
 # Устанавливаем точку входа, чтобы контейнер не завершал выполнение
-CMD ["/bin/bash"]
+# CMD ["/bin/bash"]
+CMD [ "./build/coordinator" ]

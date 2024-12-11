@@ -12,7 +12,7 @@ void RunServer() {
     CoordinatorServiceImpl service;
 
     // Вызов тестового метода
-    // service.testSubmitTask();
+    service.testSubmitTask();
 
     ServerBuilder builder;
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());

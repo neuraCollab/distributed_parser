@@ -17,7 +17,7 @@ public:
     grpc::Status SubmitTask(grpc::ServerContext* context, const parser::SubmitTaskRequest* request, parser::SubmitTaskResponse* response) override;
 
     // Метод для тестирования SubmitTask
-    // void testSubmitTask();
+    void testSubmitTask();
 
 private:
     std::vector<std::string> tasks;  // Очередь заданий

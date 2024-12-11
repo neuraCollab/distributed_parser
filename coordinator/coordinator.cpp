@@ -38,24 +38,62 @@ grpc::Status CoordinatorServiceImpl::SubmitTask(grpc::ServerContext* context, co
     return grpc::Status::OK;
 }
 
-// // Реализация метода тестирования
-// void CoordinatorServiceImpl::testSubmitTask() {
-//     parser::SubmitTaskRequest request;
-//     parser::SubmitTaskResponse response;
+// Реализация метода тестирования
+// Реализация метода тестирования
+void CoordinatorServiceImpl::testSubmitTask() {
+    parser::SubmitTaskRequest request;
+    parser::SubmitTaskResponse response;
 
-//     // Установите тестовый URL
-//     request.set_url("http://example.com/test-task");
+    // Установите тестовый URL
+    std::string test_url = "http://example.com/test-task";
+    request.set_url(test_url);
 
-//     // Создайте фиктивный контекст
-//     grpc::ServerContext context;
+    // Лог начальных данных
+    std::cout << "[Debug] Test URL set: " << test_url << std::endl;
 
-//     // Вызовите SubmitTask
-//     grpc::Status status = SubmitTask(&context, &request, &response);
+    // Создайте фиктивный контекст
+    grpc::ServerContext context;
 
-//     // Вывод результатов теста
-//     if (status.ok() && response.success()) {
-//         std::cout << "Test task submitted successfully: " << request.url() << std::endl;
-//     } else {
-//         std::cout << "Test task submission failed!" << std::endl;
-//     }
-// }
+    // Лог начала вызова SubmitTask
+    std::cout << "[Debug] Calling SubmitTask..." << std::endl;
+
+    // Вызовите SubmitTask
+    grpc::Status status = SubmitTask(&context, &request, &response);
+
+    // Лог результата вызова SubmitTask
+    if (status.ok()) {
+        std::cout << "[Debug] SubmitTask completed successfully." << std::endl;
+    } else {
+        std::cout << "[Debug] SubmitTask failed. Error: " << status.error_message() << std::endl;
+    }
+
+    // Лог ответа от SubmitTask
+    // std::cout << "[Debug] Response success flag: " << response.success() << std::endl;
+
+    // // Проверка статуса выполнения SubmitTask
+    if (status.ok() && response.success()) {
+        std::cout << "[Test] Task submitted successfully: " << test_url << std::endl;
+
+        // Дополнительно: Проверьте, что задача добавлена в очередь
+        {
+            std::lock_guard<std::mutex> lock(mu_);
+            std::cout << "[Debug] Checking task queue..." << std::endl;
+
+            if (!tasks.empty()) {
+                std::cout << "[Debug] Task queue is not empty. Back task: " << tasks.back() << std::endl;
+            } else {
+                std::cout << "[Debug] Task queue is empty." << std::endl;
+            }
+
+            if (!tasks.empty() && tasks.back() == test_url) {
+                std::cout << "[Test] Task successfully added to the queue." << std::endl;
+            } else {
+                std::cout << "[Test] Task was not added to the queue as expected." << std::endl;
+            }
+        }
+    } else {
+        std::cout << "[Test] Task submission failed!" << std::endl;
+        std::cout << "[Test] gRPC Status: " << status.error_message() << std::endl;
+    }
+}
+

@@ -4,7 +4,7 @@
 #include <iostream>
 
 int main(int argc, char** argv) {
-    WorkerClient worker(grpc::CreateChannel("localhost:50051", grpc::InsecureChannelCredentials()));
+    WorkerClient worker(grpc::CreateChannel("coordinator:50051", grpc::InsecureChannelCredentials()));
 
     while (true) {
         // Получение задания от координатора

@@ -43,54 +43,64 @@ void WorkerClient::ReportResult(const std::string& url, const std::string& resul
 
 // Сохранение результата в базу данных Apache Cassandra
 void saveToCassandra(const std::string& url, const std::vector<std::string>& links, double time_taken) {
-    // Инициализация подключения к Cassandra
+    // Initialize Cassandra connection
     CassCluster* cluster = cass_cluster_new();
     CassSession* session = cass_session_new();
 
-    // Настройка контактов (узлов кластера)
-    cass_cluster_set_contact_points(cluster, "127.0.0.1");
+    // Set contact points to the Cassandra container name (Docker networking resolves this)
+    cass_cluster_set_contact_points(cluster, "cassandra");
 
-    // Подключение к ключевому пространству "parser"
+    // Set other configurations if necessary
+    cass_cluster_set_protocol_version(cluster, CASS_PROTOCOL_VERSION_V4);
+
+    // Connect to the "parser" keyspace
     CassFuture* connect_future = cass_session_connect_keyspace(session, cluster, "parser");
 
-    // Ожидание подключения
+    // Check if the connection was successful
     if (cass_future_error_code(connect_future) == CASS_OK) {
-        // Подготовка запроса на вставку данных
+        // Prepare the CQL query for inserting data
         const char* query = "INSERT INTO parsed_results (url, links, time_taken) VALUES (?, ?, ?)";
         CassStatement* statement = cass_statement_new(query, 3);
-        
-        // Установка значений в запрос
+
+        // Bind URL to the query
         cass_statement_bind_string(statement, 0, url.c_str());
 
-        // Конвертация ссылок в формат Cassandra (set<text>)
-        CassCollection* link_collection = cass_collection_new(CASS_COLLECTION_TYPE_SET, links.size());
+        // Convert links to a Cassandra collection (list<text>)
+        CassCollection* link_collection = cass_collection_new(CASS_COLLECTION_TYPE_LIST, links.size());
         for (const auto& link : links) {
             cass_collection_append_string(link_collection, link.c_str());
         }
         cass_statement_bind_collection(statement, 1, link_collection);
         cass_collection_free(link_collection);
 
-        // Установка времени выполнения
+        // Bind execution time
         cass_statement_bind_double(statement, 2, time_taken);
 
-        // Выполнение запроса
+        // Execute the query
         CassFuture* result_future = cass_session_execute(session, statement);
 
+        // Check execution status
         if (cass_future_error_code(result_future) != CASS_OK) {
             const char* message;
             size_t message_length;
             cass_future_error_message(result_future, &message, &message_length);
-            std::cerr << "Unable to save result to Cassandra: " << std::string(message, message_length) << std::endl;
+            std::cerr << "Error saving result to Cassandra: " << std::string(message, message_length) << std::endl;
+        } else {
+            std::cout << "Data successfully saved to Cassandra." << std::endl;
         }
 
-        // Освобождение ресурсов
+        // Free resources
         cass_statement_free(statement);
         cass_future_free(result_future);
     } else {
-        std::cerr << "Unable to connect to Cassandra" << std::endl;
+        // Connection failed
+        const char* message;
+        size_t message_length;
+        cass_future_error_message(connect_future, &message, &message_length);
+        std::cerr << "Error connecting to Cassandra: " << std::string(message, message_length) << std::endl;
     }
 
-    // Освобождение ресурсов
+    // Free resources
     cass_future_free(connect_future);
     cass_session_free(session);
     cass_cluster_free(cluster);

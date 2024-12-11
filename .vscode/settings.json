@@ -69,6 +69,10 @@
         "execution": "cpp",
         "ios": "cpp",
         "locale": "cpp",
-        "print": "cpp"
+        "print": "cpp",
+        "span": "cpp",
+        "forward_list": "cpp",
+        "queue": "cpp",
+        "stack": "cpp"
     }
 }
