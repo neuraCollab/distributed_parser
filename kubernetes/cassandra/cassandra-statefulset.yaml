@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: cassandra
+spec:
+  serviceName: cassandra
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cassandra
+  template:
+    metadata:
+      labels:
+        app: cassandra
+    spec:
+      containers:
+      - name: cassandra
+        image: cassandra:latest
+        ports:
+        - containerPort: 9042
+        - containerPort: 7000
+        - containerPort: 7001
+        - containerPort: 7199
+        env:
+        - name: CASSANDRA_CLUSTER_NAME
+          value: MyCluster
+        - name: CASSANDRA_DC
+          value: datacenter1
+        - name: CASSANDRA_RACK
+          value: rack1
+        - name: CASSANDRA_ENDPOINT_SNITCH
+          value: GossipingPropertyFileSnitch
+        volumeMounts:
+        - name: cassandra-data
+          mountPath: /var/lib/cassandra
+        - name: cassandra-init
+          mountPath: /docker-entrypoint-initdb.d/setup.cql
+          subPath: setup.cql
+      volumes:
+      - name: cassandra-init
+        configMap:
+          name: cassandra-config
+  volumeClaimTemplates:
+  - metadata:
+      name: cassandra-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi

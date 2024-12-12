@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: worker
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: worker
@@ -15,5 +15,3 @@ spec:
       containers:
       - name: worker
         image: worker:latest
-        ports:
-        - containerPort: 50052

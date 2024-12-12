@@ -4,3 +4,5 @@ docker run --rm \
   -v $(pwd)/proto_files:/app/proto_files \
   -v $(pwd)/generated:/app/generated \
   grpc-generator
+
+minikube dashboard

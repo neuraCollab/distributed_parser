@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cassandra-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cassandra-web
+  template:
+    metadata:
+      labels:
+        app: cassandra-web
+    spec:
+      containers:
+      - name: cassandra-web
+        image: ipushc/cassandra-web:latest
+        ports:
+        - containerPort: 8083
+        env:
+        - name: CASSANDRA_HOST
+          value: cassandra
+        - name: CASSANDRA_PORT
+          value: "9042"
+        - name: CASSANDRA_USERNAME
+          value: cassandra
+        - name: CASSANDRA_PASSWORD
+          value: cassandra
