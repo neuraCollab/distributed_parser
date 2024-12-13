@@ -19,7 +19,7 @@ services:
     networks:
       - app-network
     healthcheck:
-      test: ["CMD", "cqlsh", "-e", "DESCRIBE KEYSPACES"]
+      test: ["CMD", "cqlsh", "-f", "/docker-entrypoint-initdb.d/setup.cql"]
       interval: 10s
       timeout: 10s
       retries: 10
@@ -55,6 +55,8 @@ services:
       dockerfile: Dockerfile
     networks:
       - app-network
+    deploy:
+      replicas: 3
     depends_on:
       cassandra:
         condition: service_healthy

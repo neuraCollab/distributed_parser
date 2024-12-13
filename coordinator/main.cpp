@@ -12,7 +12,10 @@ void RunServer() {
     CoordinatorServiceImpl service;
 
     // Вызов тестового метода
-    service.testSubmitTask();
+    for (int i = 0; i < 10; ++i) {
+        std::cout << "Submitting task #" << i + 1 << std::endl;
+        service.testSubmitTask(); // Предполагается, что submitTask реализован в CoordinatorServiceImpl
+    }
 
     ServerBuilder builder;
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
