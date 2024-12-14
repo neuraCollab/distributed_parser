@@ -12,6 +12,16 @@ spec:
       labels:
         app: coordinator
     spec:
+      
+
       containers:
       - name: coordinator
-        image: coordinator:latest
+        image: distributed_parser-coordinator:latest
+        imagePullPolicy: IfNotPresent
+        resources:
+            requests:
+              memory: "200Mi"
+              cpu: "500m"
+            limits:
+              memory: "1.5Gi"
+              cpu: "1000m"

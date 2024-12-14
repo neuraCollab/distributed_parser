@@ -6,3 +6,17 @@ docker run --rm \
   grpc-generator
 
 minikube dashboard
+
+kubectl apply -f ./kubernetes/  --recursive
+kubectl apply -f ./kubernetes/ --dry-run=client --recursive #kubectl проверил корректность всех манифестов, но не применил их.
+minikube start
+minikube status
+
+kubectl delete all --all
+
+minikube ip
+
+minikube service cassandra-web
+
+minikube image load coordinator:latest
+minikube image load worker:latest

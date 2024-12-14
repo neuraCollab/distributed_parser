@@ -1,20 +1,27 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: cassandra-service
-  namespace: default
+  name: cassandra
   labels:
     app: cassandra
 spec:
-  clusterIP: None # Headless сервис для прямого доступа к каждому узлу
-  ports:
-  - name: cql
-    port: 9042
-  - name: intra-node
-    port: 7000
-  - name: intra-node-tls
-    port: 7001
-  - name: jmx
-    port: 7199
   selector:
     app: cassandra
+  ports:
+    - name: cql
+      protocol: TCP
+      port: 9042
+      targetPort: 9042
+    - name: intra-node
+      protocol: TCP
+      port: 7000
+      targetPort: 7000
+    - name: intra-node-tls
+      protocol: TCP
+      port: 7001
+      targetPort: 7001
+    - name: jmx
+      protocol: TCP
+      port: 7199
+      targetPort: 7199
+  type: ClusterIP
